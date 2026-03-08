@@ -1,0 +1,16 @@
+# DB Compare - Apache Configuration
+# Ensure PHP files are processed and directory listing is disabled
+
+Options -Indexes
+DirectoryIndex index.html index.php
+
+# Deny access to source files directly
+<FilesMatch "^(DbConnection|DatabaseComparator)\.php$">
+    Require all denied
+</FilesMatch>
+
+# Protect the src directory
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^src/ - [F,L]
+</IfModule>

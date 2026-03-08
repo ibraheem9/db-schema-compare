@@ -1,0 +1,15 @@
+{
+    "name": "db-compare/mysql-schema-comparator",
+    "description": "A PHP tool to compare MySQL database schemas and generate SQL fix scripts",
+    "version": "1.0.0",
+    "type": "project",
+    "license": "MIT",
+    "require": {
+        "php": ">=7.4",
+        "ext-pdo": "*",
+        "ext-pdo_mysql": "*"
+    },
+    "autoload": {
+        "classmap": ["src/"]
+    }
+}
