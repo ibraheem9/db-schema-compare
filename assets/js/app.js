@@ -191,6 +191,7 @@
                     <div class="tab" data-tab="tab-tables">Missing Tables</div>
                     <div class="tab" data-tab="tab-columns">Column Diffs</div>
                     <div class="tab" data-tab="tab-indexes">Index Diffs</div>
+                    <div class="tab" data-tab="tab-fkeys">FK Diffs</div>
                     <div class="tab" data-tab="tab-sql">SQL Fix Scripts</div>
                 </div>`;
 
@@ -212,6 +213,11 @@
             // --- Tab: Index Diffs ---
             html += `<div class="tab-content" id="tab-indexes">`;
             html += this.renderIndexDiffs(results, dbNameA, dbNameB);
+            html += `</div>`;
+
+            // --- Tab: FK Diffs ---
+            html += `<div class="tab-content" id="tab-fkeys">`;
+            html += this.renderFkDiffs(results, dbNameA, dbNameB);
             html += `</div>`;
 
             // --- Tab: SQL Fix Scripts ---
@@ -387,6 +393,57 @@
                         <thead><tr><th>Index Name</th><th>Unique</th><th>Columns</th></tr></thead><tbody>`;
                     for (const [name, idx] of Object.entries(missingA)) {
                         html += `<tr><td><strong>${this.esc(name)}</strong></td><td>${idx.unique ? 'Yes' : 'No'}</td><td>${this.esc(idx.columns.join(', '))}</td></tr>`;
+                    }
+                    html += `</tbody></table></div>`;
+                }
+
+                html += `</div></div></div>`;
+            }
+            return html;
+        },
+
+        renderFkDiffs(results, dbNameA, dbNameB) {
+            const diffs = results.fkDiffs || {};
+            if (!Object.keys(diffs).length) {
+                return `<div class="card"><div class="card-body"><div class="empty-state">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    <h3>No foreign key differences</h3><p>All shared tables have identical foreign key constraints.</p></div></div></div>`;
+            }
+
+            let html = '';
+            for (const [table, fd] of Object.entries(diffs)) {
+                html += `<div class="card">
+                    <div class="collapsible-header">
+                        <span><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> <strong style="margin-left:6px">${this.esc(table)}</strong></span>
+                        <span class="chevron"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+                    </div>
+                    <div class="collapsible-body"><div class="card-body">`;
+
+                const missingB = fd.missingInB || {};
+                const missingA = fd.missingInA || {};
+
+                if (Object.keys(missingB).length) {
+                    html += `<p style="margin-bottom:8px"><span class="badge badge-missing">Missing in ${this.esc(dbNameB)}</span></p>
+                    <div class="table-wrapper" style="margin-bottom:16px"><table>
+                        <thead><tr><th>Constraint Name</th><th>Column</th><th>References Table</th><th>References Column</th></tr></thead><tbody>`;
+                    for (const [name, fk] of Object.entries(missingB)) {
+                        html += `<tr><td><strong>${this.esc(name)}</strong></td>
+                            <td><code>${this.esc(fk.COLUMN_NAME)}</code></td>
+                            <td><code>${this.esc(fk.REFERENCED_TABLE_NAME)}</code></td>
+                            <td><code>${this.esc(fk.REFERENCED_COLUMN_NAME)}</code></td></tr>`;
+                    }
+                    html += `</tbody></table></div>`;
+                }
+
+                if (Object.keys(missingA).length) {
+                    html += `<p style="margin-bottom:8px"><span class="badge badge-missing">Missing in ${this.esc(dbNameA)}</span></p>
+                    <div class="table-wrapper" style="margin-bottom:16px"><table>
+                        <thead><tr><th>Constraint Name</th><th>Column</th><th>References Table</th><th>References Column</th></tr></thead><tbody>`;
+                    for (const [name, fk] of Object.entries(missingA)) {
+                        html += `<tr><td><strong>${this.esc(name)}</strong></td>
+                            <td><code>${this.esc(fk.COLUMN_NAME)}</code></td>
+                            <td><code>${this.esc(fk.REFERENCED_TABLE_NAME)}</code></td>
+                            <td><code>${this.esc(fk.REFERENCED_COLUMN_NAME)}</code></td></tr>`;
                     }
                     html += `</tbody></table></div>`;
                 }
