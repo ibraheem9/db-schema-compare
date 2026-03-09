@@ -1,35 +1,24 @@
 -- ============================================================================
--- DB Compare - Test Database B (Target / Stripped-Down / Different)
+-- STEP 3: Create tables for test_db_b (Target / Stripped-Down / Different)
 -- ============================================================================
--- This database is intentionally different from Database A to exercise
--- every comparison feature of the DB Compare tool:
---
---   1. MISSING TABLES:      tags, product_tags, settings exist only in A
---                            coupons, wishlists exist only in B
---   2. COLUMN DIFFERENCES:  Type changes, nullable changes, default changes,
---                            extra changes, missing columns, extra columns
---   3. INDEX DIFFERENCES:   Missing indexes, extra indexes, different indexes
---   4. FK DIFFERENCES:      Missing FKs, extra FKs
+-- Run AFTER 01_create_databases.sql
+-- Tables are ordered by foreign key dependencies.
 --
 -- Usage:
---   mysql -u root < database_b.sql
+--   mysql -u root -p test_db_b < 03_tables_db_b.sql
 -- ============================================================================
 
-DROP DATABASE IF EXISTS `test_db_b`;
-CREATE DATABASE `test_db_b` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE `test_db_b`;
-
 -- ============================================================================
--- TABLE 1: all_data_types
+-- TABLE: all_data_types
 -- Differences from A:
 --   - MISSING columns: binary_val, varbinary_val, tinyblob_val, mediumblob_val,
 --                       longblob_val, flags
---   - EXTRA columns:   uuid_val, geometry_val
+--   - EXTRA columns:   uuid_val
 --   - TYPE changes:    decimal_val (12,4 -> 10,2), varchar_val (255 -> 500),
 --                      char_val (10 -> 20)
 --   - NULLABLE change: tiny_val (NOT NULL -> NULL)
---   - DEFAULT change:  status ENUM has different options
---   - EXTRA change:    (none, but AUTO_INCREMENT stays same)
+--   - ENUM change:     status has extra 'deleted' value
+--   - SET change:      tags has extra 'critical' value
 -- ============================================================================
 CREATE TABLE `all_data_types` (
     `id`                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -38,53 +27,42 @@ CREATE TABLE `all_data_types` (
     `medium_val`        MEDIUMINT NOT NULL DEFAULT 0,
     `int_val`           INT NOT NULL DEFAULT 0,
     `big_val`           BIGINT NOT NULL DEFAULT 0,
-
     `decimal_val`       DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     `float_val`         FLOAT(8,2) DEFAULT NULL,
     `double_val`        DOUBLE(16,4) DEFAULT NULL,
-
     `char_val`          CHAR(20) NOT NULL DEFAULT '',
     `varchar_val`       VARCHAR(500) NOT NULL DEFAULT '',
     `tinytext_val`      TINYTEXT,
     `text_val`          TEXT,
     `mediumtext_val`    MEDIUMTEXT,
     `longtext_val`      LONGTEXT,
-
     `blob_val`          BLOB,
-
     `date_val`          DATE DEFAULT NULL,
     `datetime_val`      DATETIME DEFAULT NULL,
     `timestamp_val`     TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     `time_val`          TIME DEFAULT NULL,
     `year_val`          YEAR DEFAULT NULL,
-
     `status`            ENUM('active','inactive','pending','archived','deleted') NOT NULL DEFAULT 'active',
     `tags`              SET('urgent','important','normal','low','critical') DEFAULT 'normal',
-
     `json_data`         JSON DEFAULT NULL,
-
     `is_active`         BOOLEAN NOT NULL DEFAULT TRUE,
     `is_deleted`        BOOLEAN NOT NULL DEFAULT FALSE,
-
-    -- Extra columns not in A
     `uuid_val`          CHAR(36) DEFAULT NULL,
-
     PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- ============================================================================
--- TABLE 2: users
+-- TABLE: users
 -- Differences from A:
 --   - MISSING columns: phone, avatar_url, bio, is_premium, balance
 --   - EXTRA columns:   timezone, language, two_factor_enabled
 --   - TYPE change:     email (VARCHAR(150) -> VARCHAR(100))
---   - ENUM change:     role has fewer options (no super_admin, moderator)
---   - ENUM change:     status has different options
---   - DEFAULT change:  login_count default 0 -> 1
+--   - ENUM change:     role has fewer options
+--   - ENUM change:     status has fewer options
+--   - DEFAULT change:  login_count (0 -> 1)
 --   - MISSING indexes: idx_name, idx_premium_status
 --   - EXTRA indexes:   idx_language
---   - MISSING FK:      (none here, users has no FK in A either)
 -- ============================================================================
 CREATE TABLE `users` (
     `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -105,7 +83,6 @@ CREATE TABLE `users` (
     `two_factor_enabled` BOOLEAN NOT NULL DEFAULT FALSE,
     `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_uuid` (`uuid`),
     UNIQUE KEY `uk_username` (`username`),
@@ -118,14 +95,14 @@ CREATE TABLE `users` (
 
 
 -- ============================================================================
--- TABLE 3: categories
+-- TABLE: categories
 -- Differences from A:
 --   - MISSING columns: icon, meta_title, meta_description
 --   - EXTRA columns:   image_url, badge_text
 --   - TYPE change:     name (VARCHAR(100) -> VARCHAR(150))
---   - NULLABLE change: description (NULL -> NOT NULL with default '')
+--   - NULLABLE change: description (NULL -> NOT NULL)
 --   - MISSING index:   idx_sort
---   - MISSING FK:      fk_category_parent (no self-referencing FK)
+--   - MISSING FK:      fk_category_parent
 -- ============================================================================
 CREATE TABLE `categories` (
     `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -139,7 +116,6 @@ CREATE TABLE `categories` (
     `is_visible`        BOOLEAN NOT NULL DEFAULT TRUE,
     `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_slug` (`slug`),
     INDEX `idx_parent` (`parent_id`)
@@ -147,7 +123,7 @@ CREATE TABLE `categories` (
 
 
 -- ============================================================================
--- TABLE 4: products
+-- TABLE: products (depends on: categories)
 -- Differences from A:
 --   - MISSING columns: compare_price, cost_price, weight, dimensions,
 --                       is_digital, tax_class, metadata, published_at
@@ -157,7 +133,6 @@ CREATE TABLE `categories` (
 --   - ENUM change:     status has different values
 --   - MISSING indexes: idx_price, idx_featured, idx_published, idx_name_status
 --   - EXTRA indexes:   idx_brand, idx_rating
---   - FK same:         fk_product_category exists in both
 -- ============================================================================
 CREATE TABLE `products` (
     `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -177,7 +152,6 @@ CREATE TABLE `products` (
     `review_count`      INT UNSIGNED NOT NULL DEFAULT 0,
     `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_sku` (`sku`),
     UNIQUE KEY `uk_slug` (`slug`),
@@ -190,12 +164,12 @@ CREATE TABLE `products` (
 
 
 -- ============================================================================
--- TABLE 5: product_images
+-- TABLE: product_images (depends on: products)
 -- Differences from A:
 --   - MISSING columns: alt_text, file_size, mime_type, width, height
 --   - EXTRA columns:   caption, blurhash
 --   - MISSING index:   idx_primary
---   - MISSING FK:      fk_image_product (FK removed in B)
+--   - MISSING FK:      fk_image_product
 -- ============================================================================
 CREATE TABLE `product_images` (
     `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -206,14 +180,13 @@ CREATE TABLE `product_images` (
     `sort_order`        INT NOT NULL DEFAULT 0,
     `is_primary`        BOOLEAN NOT NULL DEFAULT FALSE,
     `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
     PRIMARY KEY (`id`),
     INDEX `idx_product` (`product_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- ============================================================================
--- TABLE 6: orders
+-- TABLE: orders (depends on: users)
 -- Differences from A:
 --   - MISSING columns: payment_status, payment_method, shipping_amount,
 --                       discount_amount, shipping_name, shipping_address,
@@ -225,7 +198,6 @@ CREATE TABLE `product_images` (
 --   - ENUM change:     status has fewer options
 --   - MISSING indexes: idx_payment_status, idx_user_status
 --   - EXTRA indexes:   idx_tracking
---   - FK same:         fk_order_user exists in both
 -- ============================================================================
 CREATE TABLE `orders` (
     `id`                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -242,7 +214,6 @@ CREATE TABLE `orders` (
     `ordered_at`        DATETIME NOT NULL,
     `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_order_number` (`order_number`),
     INDEX `idx_user` (`user_id`),
@@ -254,15 +225,14 @@ CREATE TABLE `orders` (
 
 
 -- ============================================================================
--- TABLE 7: order_items
+-- TABLE: order_items (depends on: orders)
 -- Differences from A:
 --   - MISSING columns: product_name, sku, discount, tax, metadata
 --   - EXTRA columns:   variant_id, variant_name
 --   - TYPE change:     quantity (INT UNSIGNED -> SMALLINT UNSIGNED)
 --   - MISSING index:   idx_sku
 --   - EXTRA index:     idx_variant
---   - MISSING FK:      fk_item_product (FK to products removed)
---   - EXTRA FK:        (none)
+--   - MISSING FK:      fk_item_product
 -- ============================================================================
 CREATE TABLE `order_items` (
     `id`                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -274,7 +244,6 @@ CREATE TABLE `order_items` (
     `unit_price`        DECIMAL(12,2) NOT NULL DEFAULT 0.00,
     `total`             DECIMAL(12,2) NOT NULL DEFAULT 0.00,
     `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
     PRIMARY KEY (`id`),
     INDEX `idx_order` (`order_id`),
     INDEX `idx_product` (`product_id`),
@@ -284,16 +253,15 @@ CREATE TABLE `order_items` (
 
 
 -- ============================================================================
--- TABLE 8: reviews
+-- TABLE: reviews (depends on: products, users)
 -- Differences from A:
 --   - MISSING columns: pros, cons, is_verified, helpful_count
 --   - EXTRA columns:   images_json, reply_text, reply_at
 --   - TYPE change:     rating (TINYINT UNSIGNED -> SMALLINT)
---   - NULLABLE change: title (NULL -> NOT NULL)
+--   - NULLABLE change: title (NULL -> NOT NULL with default '')
 --   - MISSING index:   idx_product_rating, idx_approved
---   - MISSING unique:  uk_user_product (removed)
+--   - MISSING unique:  uk_user_product
 --   - EXTRA index:     idx_created
---   - FK difference:   fk_review_user exists in both, fk_review_product exists in both
 -- ============================================================================
 CREATE TABLE `reviews` (
     `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -308,7 +276,6 @@ CREATE TABLE `reviews` (
     `is_approved`       BOOLEAN NOT NULL DEFAULT FALSE,
     `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
     PRIMARY KEY (`id`),
     INDEX `idx_product` (`product_id`),
     INDEX `idx_user` (`user_id`),
@@ -320,14 +287,14 @@ CREATE TABLE `reviews` (
 
 
 -- ============================================================================
--- TABLE 9: audit_logs
+-- TABLE: audit_logs (no FK in B)
 -- Differences from A:
 --   - MISSING columns: user_agent, session_id, request_url, severity
 --   - EXTRA columns:   browser, os, country_code
 --   - TYPE change:     entity_type (VARCHAR(100) -> VARCHAR(50))
 --   - MISSING indexes: idx_severity, idx_session
 --   - EXTRA indexes:   idx_country
---   - MISSING FK:      fk_audit_user (FK removed in B)
+--   - MISSING FK:      fk_audit_user
 -- ============================================================================
 CREATE TABLE `audit_logs` (
     `id`                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -342,7 +309,6 @@ CREATE TABLE `audit_logs` (
     `os`                VARCHAR(50) DEFAULT NULL,
     `country_code`      CHAR(2) DEFAULT NULL,
     `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
     PRIMARY KEY (`id`),
     INDEX `idx_user` (`user_id`),
     INDEX `idx_action` (`action`),
@@ -353,14 +319,14 @@ CREATE TABLE `audit_logs` (
 
 
 -- ============================================================================
--- TABLE 10: notifications
+-- TABLE: notifications (no FK in B)
 -- Differences from A:
 --   - MISSING columns: data, channel, priority, sent_at, expires_at
 --   - EXTRA columns:   action_url, icon, category
 --   - TYPE change:     message (TEXT -> VARCHAR(1000))
 --   - MISSING indexes: idx_channel, idx_priority, idx_expires
 --   - EXTRA indexes:   idx_category
---   - MISSING FK:      fk_notification_user (FK removed in B)
+--   - MISSING FK:      fk_notification_user
 -- ============================================================================
 CREATE TABLE `notifications` (
     `id`                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -374,7 +340,6 @@ CREATE TABLE `notifications` (
     `is_read`           BOOLEAN NOT NULL DEFAULT FALSE,
     `read_at`           DATETIME DEFAULT NULL,
     `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
     PRIMARY KEY (`id`),
     INDEX `idx_user` (`user_id`),
     INDEX `idx_type` (`type`),
@@ -384,7 +349,7 @@ CREATE TABLE `notifications` (
 
 
 -- ============================================================================
--- TABLE 11: media_files
+-- TABLE: media_files (no FK in B)
 -- Differences from A:
 --   - MISSING columns: thumbnail_path, checksum, width, height, duration,
 --                       disk, visibility, metadata
@@ -392,7 +357,7 @@ CREATE TABLE `notifications` (
 --   - TYPE change:     file_size (BIGINT UNSIGNED -> INT UNSIGNED)
 --   - MISSING indexes: idx_mime, idx_disk, idx_checksum
 --   - EXTRA indexes:   idx_folder
---   - MISSING FK:      fk_media_user (FK removed in B)
+--   - MISSING FK:      fk_media_user
 -- ============================================================================
 CREATE TABLE `media_files` (
     `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -407,7 +372,6 @@ CREATE TABLE `media_files` (
     `download_count`    INT UNSIGNED NOT NULL DEFAULT 0,
     `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
     PRIMARY KEY (`id`),
     INDEX `idx_user` (`user_id`),
     INDEX `idx_folder` (`folder`)
@@ -415,8 +379,7 @@ CREATE TABLE `media_files` (
 
 
 -- ============================================================================
--- TABLE 12: coupons (exists ONLY in DB B)
--- Purpose: Tests "missing in A" detection
+-- TABLE: coupons (exists ONLY in DB B, no FK dependencies)
 -- ============================================================================
 CREATE TABLE `coupons` (
     `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -432,7 +395,6 @@ CREATE TABLE `coupons` (
     `expires_at`        DATETIME DEFAULT NULL,
     `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_code` (`code`),
     INDEX `idx_active` (`is_active`),
@@ -441,8 +403,7 @@ CREATE TABLE `coupons` (
 
 
 -- ============================================================================
--- TABLE 13: wishlists (exists ONLY in DB B)
--- Purpose: Tests "missing in A" with FK
+-- TABLE: wishlists (exists ONLY in DB B, depends on: users, products)
 -- ============================================================================
 CREATE TABLE `wishlists` (
     `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -451,7 +412,6 @@ CREATE TABLE `wishlists` (
     `priority`          TINYINT UNSIGNED NOT NULL DEFAULT 0,
     `notes`             VARCHAR(500) DEFAULT NULL,
     `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_user_product` (`user_id`, `product_id`),
     INDEX `idx_user` (`user_id`),

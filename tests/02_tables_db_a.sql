@@ -1,80 +1,56 @@
 -- ============================================================================
--- DB Compare - Test Database A (Source / Full-Featured)
+-- STEP 2: Create tables for test_db_a (Source / Full-Featured)
 -- ============================================================================
--- This database contains all MySQL data types, indexes, foreign keys,
--- and various column configurations to fully exercise every comparison
--- feature of the DB Compare tool.
+-- Run AFTER 01_create_databases.sql
+-- Tables are ordered by foreign key dependencies.
 --
 -- Usage:
---   mysql -u root < database_a.sql
+--   mysql -u root -p test_db_a < 02_tables_db_a.sql
 -- ============================================================================
 
-DROP DATABASE IF EXISTS `test_db_a`;
-CREATE DATABASE `test_db_a` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE `test_db_a`;
-
 -- ============================================================================
--- TABLE 1: all_data_types
--- Purpose: Covers every major MySQL data type category
+-- TABLE: all_data_types
+-- Covers every major MySQL data type category (no FK dependencies)
 -- ============================================================================
 CREATE TABLE `all_data_types` (
-    -- Integer types
     `id`                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     `tiny_val`          TINYINT NOT NULL DEFAULT 0,
     `small_val`         SMALLINT NOT NULL DEFAULT 0,
     `medium_val`        MEDIUMINT NOT NULL DEFAULT 0,
     `int_val`           INT NOT NULL DEFAULT 0,
     `big_val`           BIGINT NOT NULL DEFAULT 0,
-
-    -- Decimal / Floating-point types
     `decimal_val`       DECIMAL(12,4) NOT NULL DEFAULT 0.0000,
     `float_val`         FLOAT(8,2) DEFAULT NULL,
     `double_val`        DOUBLE(16,4) DEFAULT NULL,
-
-    -- String types
     `char_val`          CHAR(10) NOT NULL DEFAULT '',
     `varchar_val`       VARCHAR(255) NOT NULL DEFAULT '',
     `tinytext_val`      TINYTEXT,
     `text_val`          TEXT,
     `mediumtext_val`    MEDIUMTEXT,
     `longtext_val`      LONGTEXT,
-
-    -- Binary types
     `binary_val`        BINARY(16) DEFAULT NULL,
     `varbinary_val`     VARBINARY(256) DEFAULT NULL,
     `tinyblob_val`      TINYBLOB,
     `blob_val`          BLOB,
     `mediumblob_val`    MEDIUMBLOB,
     `longblob_val`      LONGBLOB,
-
-    -- Date and Time types
     `date_val`          DATE DEFAULT NULL,
     `datetime_val`      DATETIME DEFAULT NULL,
     `timestamp_val`     TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     `time_val`          TIME DEFAULT NULL,
     `year_val`          YEAR DEFAULT NULL,
-
-    -- Enum and Set
     `status`            ENUM('active','inactive','pending','archived') NOT NULL DEFAULT 'active',
     `tags`              SET('urgent','important','normal','low') DEFAULT 'normal',
-
-    -- JSON
     `json_data`         JSON DEFAULT NULL,
-
-    -- Boolean (alias for TINYINT(1))
     `is_active`         BOOLEAN NOT NULL DEFAULT TRUE,
     `is_deleted`        BOOLEAN NOT NULL DEFAULT FALSE,
-
-    -- BIT type
     `flags`             BIT(8) DEFAULT NULL,
-
     PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- ============================================================================
--- TABLE 2: users
--- Purpose: Core user table with various constraints
+-- TABLE: users (no FK dependencies)
 -- ============================================================================
 CREATE TABLE `users` (
     `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -97,7 +73,6 @@ CREATE TABLE `users` (
     `balance`           DECIMAL(15,2) NOT NULL DEFAULT 0.00,
     `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_uuid` (`uuid`),
     UNIQUE KEY `uk_username` (`username`),
@@ -111,8 +86,43 @@ CREATE TABLE `users` (
 
 
 -- ============================================================================
--- TABLE 3: categories
--- Purpose: Self-referencing table (parent_id FK to itself)
+-- TABLE: settings (no FK dependencies)
+-- ============================================================================
+CREATE TABLE `settings` (
+    `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `group_name`        VARCHAR(50) NOT NULL DEFAULT 'general',
+    `setting_key`       VARCHAR(100) NOT NULL,
+    `setting_value`     TEXT,
+    `setting_type`      ENUM('string','integer','boolean','json','file') NOT NULL DEFAULT 'string',
+    `is_public`         BOOLEAN NOT NULL DEFAULT FALSE,
+    `description`       VARCHAR(500) DEFAULT NULL,
+    `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_group_key` (`group_name`, `setting_key`),
+    INDEX `idx_group` (`group_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ============================================================================
+-- TABLE: tags (no FK dependencies)
+-- ============================================================================
+CREATE TABLE `tags` (
+    `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `name`              VARCHAR(50) NOT NULL,
+    `slug`              VARCHAR(60) NOT NULL,
+    `color`             CHAR(7) DEFAULT '#000000',
+    `usage_count`       INT UNSIGNED NOT NULL DEFAULT 0,
+    `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_name` (`name`),
+    UNIQUE KEY `uk_slug` (`slug`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ============================================================================
+-- TABLE: categories (self-referencing FK to itself)
+-- Depends on: nothing external (self-reference is fine)
 -- ============================================================================
 CREATE TABLE `categories` (
     `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -127,7 +137,6 @@ CREATE TABLE `categories` (
     `meta_description`  VARCHAR(500) DEFAULT NULL,
     `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_slug` (`slug`),
     INDEX `idx_parent` (`parent_id`),
@@ -137,8 +146,7 @@ CREATE TABLE `categories` (
 
 
 -- ============================================================================
--- TABLE 4: products
--- Purpose: Product catalog with FK to categories
+-- TABLE: products (depends on: categories)
 -- ============================================================================
 CREATE TABLE `products` (
     `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -162,7 +170,6 @@ CREATE TABLE `products` (
     `published_at`      DATETIME DEFAULT NULL,
     `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_sku` (`sku`),
     UNIQUE KEY `uk_slug` (`slug`),
@@ -177,8 +184,7 @@ CREATE TABLE `products` (
 
 
 -- ============================================================================
--- TABLE 5: product_images
--- Purpose: One-to-many with products, tests FK differences
+-- TABLE: product_images (depends on: products)
 -- ============================================================================
 CREATE TABLE `product_images` (
     `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -192,7 +198,6 @@ CREATE TABLE `product_images` (
     `width`             SMALLINT UNSIGNED DEFAULT NULL,
     `height`            SMALLINT UNSIGNED DEFAULT NULL,
     `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
     PRIMARY KEY (`id`),
     INDEX `idx_product` (`product_id`),
     INDEX `idx_primary` (`product_id`, `is_primary`),
@@ -201,8 +206,21 @@ CREATE TABLE `product_images` (
 
 
 -- ============================================================================
--- TABLE 6: orders
--- Purpose: Order management with multiple FKs
+-- TABLE: product_tags (depends on: products, tags)
+-- ============================================================================
+CREATE TABLE `product_tags` (
+    `product_id`        INT UNSIGNED NOT NULL,
+    `tag_id`            INT UNSIGNED NOT NULL,
+    `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`product_id`, `tag_id`),
+    INDEX `idx_tag` (`tag_id`),
+    CONSTRAINT `fk_pt_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT `fk_pt_tag` FOREIGN KEY (`tag_id`) REFERENCES `tags` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ============================================================================
+-- TABLE: orders (depends on: users)
 -- ============================================================================
 CREATE TABLE `orders` (
     `id`                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -231,7 +249,6 @@ CREATE TABLE `orders` (
     `delivered_at`      DATETIME DEFAULT NULL,
     `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_order_number` (`order_number`),
     INDEX `idx_user` (`user_id`),
@@ -244,8 +261,7 @@ CREATE TABLE `orders` (
 
 
 -- ============================================================================
--- TABLE 7: order_items
--- Purpose: Many-to-many bridge between orders and products
+-- TABLE: order_items (depends on: orders, products)
 -- ============================================================================
 CREATE TABLE `order_items` (
     `id`                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -260,7 +276,6 @@ CREATE TABLE `order_items` (
     `total`             DECIMAL(12,2) NOT NULL DEFAULT 0.00,
     `metadata`          JSON DEFAULT NULL,
     `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
     PRIMARY KEY (`id`),
     INDEX `idx_order` (`order_id`),
     INDEX `idx_product` (`product_id`),
@@ -271,8 +286,7 @@ CREATE TABLE `order_items` (
 
 
 -- ============================================================================
--- TABLE 8: reviews
--- Purpose: Product reviews with composite index
+-- TABLE: reviews (depends on: products, users)
 -- ============================================================================
 CREATE TABLE `reviews` (
     `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -288,7 +302,6 @@ CREATE TABLE `reviews` (
     `helpful_count`     INT UNSIGNED NOT NULL DEFAULT 0,
     `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
     PRIMARY KEY (`id`),
     INDEX `idx_product` (`product_id`),
     INDEX `idx_user` (`user_id`),
@@ -302,63 +315,7 @@ CREATE TABLE `reviews` (
 
 
 -- ============================================================================
--- TABLE 9: tags
--- Purpose: Simple lookup table (exists only in DB A)
--- ============================================================================
-CREATE TABLE `tags` (
-    `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `name`              VARCHAR(50) NOT NULL,
-    `slug`              VARCHAR(60) NOT NULL,
-    `color`             CHAR(7) DEFAULT '#000000',
-    `usage_count`       INT UNSIGNED NOT NULL DEFAULT 0,
-    `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_name` (`name`),
-    UNIQUE KEY `uk_slug` (`slug`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-
--- ============================================================================
--- TABLE 10: product_tags (pivot table, exists only in DB A)
--- Purpose: Many-to-many pivot with composite PK
--- ============================================================================
-CREATE TABLE `product_tags` (
-    `product_id`        INT UNSIGNED NOT NULL,
-    `tag_id`            INT UNSIGNED NOT NULL,
-    `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    PRIMARY KEY (`product_id`, `tag_id`),
-    INDEX `idx_tag` (`tag_id`),
-    CONSTRAINT `fk_pt_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT `fk_pt_tag` FOREIGN KEY (`tag_id`) REFERENCES `tags` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-
--- ============================================================================
--- TABLE 11: settings
--- Purpose: Key-value config table (exists only in DB A)
--- ============================================================================
-CREATE TABLE `settings` (
-    `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `group_name`        VARCHAR(50) NOT NULL DEFAULT 'general',
-    `setting_key`       VARCHAR(100) NOT NULL,
-    `setting_value`     TEXT,
-    `setting_type`      ENUM('string','integer','boolean','json','file') NOT NULL DEFAULT 'string',
-    `is_public`         BOOLEAN NOT NULL DEFAULT FALSE,
-    `description`       VARCHAR(500) DEFAULT NULL,
-    `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_group_key` (`group_name`, `setting_key`),
-    INDEX `idx_group` (`group_name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-
--- ============================================================================
--- TABLE 12: audit_logs
--- Purpose: Audit trail table (common but with differences)
+-- TABLE: audit_logs (depends on: users)
 -- ============================================================================
 CREATE TABLE `audit_logs` (
     `id`                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -374,7 +331,6 @@ CREATE TABLE `audit_logs` (
     `request_url`       VARCHAR(2000) DEFAULT NULL,
     `severity`          ENUM('info','warning','error','critical') NOT NULL DEFAULT 'info',
     `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
     PRIMARY KEY (`id`),
     INDEX `idx_user` (`user_id`),
     INDEX `idx_action` (`action`),
@@ -387,8 +343,7 @@ CREATE TABLE `audit_logs` (
 
 
 -- ============================================================================
--- TABLE 13: notifications
--- Purpose: Common table with column and index differences
+-- TABLE: notifications (depends on: users)
 -- ============================================================================
 CREATE TABLE `notifications` (
     `id`                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -404,7 +359,6 @@ CREATE TABLE `notifications` (
     `sent_at`           DATETIME DEFAULT NULL,
     `expires_at`        DATETIME DEFAULT NULL,
     `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
     PRIMARY KEY (`id`),
     INDEX `idx_user` (`user_id`),
     INDEX `idx_type` (`type`),
@@ -417,8 +371,7 @@ CREATE TABLE `notifications` (
 
 
 -- ============================================================================
--- TABLE 14: media_files
--- Purpose: Tests BLOB and binary data type differences
+-- TABLE: media_files (depends on: users)
 -- ============================================================================
 CREATE TABLE `media_files` (
     `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -438,7 +391,6 @@ CREATE TABLE `media_files` (
     `metadata`          JSON DEFAULT NULL,
     `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
     PRIMARY KEY (`id`),
     INDEX `idx_user` (`user_id`),
     INDEX `idx_mime` (`mime_type`),

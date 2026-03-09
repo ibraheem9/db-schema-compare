@@ -1,15 +1,33 @@
 # Test Databases for DB Compare
 
-These two SQL files create test databases designed to exercise **every feature** of the DB Compare tool. Import them into your MySQL server and use the tool to compare `test_db_a` against `test_db_b`.
+These SQL files create two test databases designed to exercise **every feature** of the DB Compare tool. They are split into three steps to avoid dependency errors.
 
 ## Quick Start
 
+Run the files in order. Each step depends on the previous one.
+
 ```bash
-mysql -u root -p < database_a.sql
-mysql -u root -p < database_b.sql
+# Step 1: Create both empty databases
+mysql -u root -p < 01_create_databases.sql
+
+# Step 2: Create tables inside test_db_a
+mysql -u root -p test_db_a < 02_tables_db_a.sql
+
+# Step 3: Create tables inside test_db_b
+mysql -u root -p test_db_b < 03_tables_db_b.sql
 ```
 
-Then open DB Compare and connect to both databases using the same host and credentials.
+Then open DB Compare and compare `test_db_a` against `test_db_b`.
+
+## File Structure
+
+| File | Purpose |
+|---|---|
+| `01_create_databases.sql` | Creates (or recreates) the two empty databases |
+| `02_tables_db_a.sql` | Creates all 14 tables inside `test_db_a` in FK dependency order |
+| `03_tables_db_b.sql` | Creates all 13 tables inside `test_db_b` in FK dependency order |
+
+Tables within each file are ordered so that referenced tables are created before the tables that reference them. This prevents `Failed to open the referenced table` errors.
 
 ## Difference Coverage Matrix
 
@@ -30,7 +48,7 @@ The table below summarizes every type of schema difference covered by these test
 | **Index Diffs** | Index missing in A | `users.idx_language`, `products.idx_brand`, `products.idx_rating`, `orders.idx_tracking`, etc. |
 | **Index Diffs** | Unique key missing in B | `reviews.uk_user_product` |
 | **FK Diffs** | FK missing in B | `categories.fk_category_parent`, `product_images.fk_image_product`, `order_items.fk_item_product`, `audit_logs.fk_audit_user`, `notifications.fk_notification_user`, `media_files.fk_media_user` |
-| **FK Diffs** | FK missing in A | (none, but `wishlists` FK only exists in B-only table) |
+| **FK Diffs** | FK missing in A | (covered by B-only tables `wishlists` with FKs) |
 
 ## Data Types Covered
 
