@@ -11,11 +11,23 @@
     // ============================================================
     const ThemeManager = {
         init() {
-            const saved = localStorage.getItem('db-compare-theme') || 'light';
-            this.set(saved);
+            const saved = localStorage.getItem('db-compare-theme');
+            if (saved) {
+                this.set(saved);
+            } else {
+                // Default to system preference
+                const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                this.set(systemDark ? 'dark' : 'light');
+            }
             document.getElementById('themeToggle').addEventListener('click', () => {
                 const current = document.documentElement.getAttribute('data-theme');
                 this.set(current === 'dark' ? 'light' : 'dark');
+            });
+            // Listen for system theme changes
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+                if (!localStorage.getItem('db-compare-theme')) {
+                    this.set(e.matches ? 'dark' : 'light');
+                }
             });
         },
         set(theme) {
