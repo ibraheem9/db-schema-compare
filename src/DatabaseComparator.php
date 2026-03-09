@@ -4,6 +4,9 @@
  * 
  * Detects differences in tables, columns, indexes, and foreign keys
  * between two databases and generates SQL fix scripts.
+ * 
+ * CREATE TABLE statements are automatically sorted by foreign key
+ * dependency order to prevent reference errors during execution.
  */
 class DatabaseComparator
 {
@@ -77,17 +80,37 @@ class DatabaseComparator
 
     /**
      * Generate SQL fix statements from a diff array.
+     * 
+     * CREATE TABLE statements are sorted by foreign key dependency order
+     * so that referenced tables are created before tables that reference them.
+     * The execution order is:
+     *   1. CREATE TABLE (dependency-sorted)
+     *   2. ALTER TABLE ... ADD COLUMN / MODIFY COLUMN
+     *   3. ALTER TABLE ... ADD INDEX
      */
     public function generateFixSql(array $diff): array
     {
         $sql = ['a' => [], 'b' => []];
 
-        // 1. Missing tables
+        // 1. Missing tables — sorted by FK dependency order
+        $createForB = [];
         foreach ($diff['missingInB'] as $table => $createSql) {
-            $sql['b'][] = $createSql . ';';
+            $createForB[$table] = $createSql . ';';
         }
+        $createForA = [];
         foreach ($diff['missingInA'] as $table => $createSql) {
-            $sql['a'][] = $createSql . ';';
+            $createForA[$table] = $createSql . ';';
+        }
+
+        // Sort CREATE TABLE statements by dependency order
+        $sortedForB = $this->sortByDependency($createForB);
+        $sortedForA = $this->sortByDependency($createForA);
+
+        foreach ($sortedForB as $stmt) {
+            $sql['b'][] = $stmt;
+        }
+        foreach ($sortedForA as $stmt) {
+            $sql['a'][] = $stmt;
         }
 
         // 2. Column issues
@@ -118,6 +141,86 @@ class DatabaseComparator
     }
 
     // ---- Private helpers ----
+
+    /**
+     * Sort CREATE TABLE statements by foreign key dependency order.
+     * 
+     * Parses REFERENCES clauses from each CREATE TABLE statement to build
+     * a dependency graph, then performs a topological sort so that tables
+     * with no dependencies come first, and tables that reference others
+     * come after their dependencies.
+     *
+     * @param array $createStatements [tableName => createSql]
+     * @return array Ordered list of CREATE SQL strings
+     */
+    private function sortByDependency(array $createStatements): array
+    {
+        if (count($createStatements) <= 1) {
+            return array_values($createStatements);
+        }
+
+        $tableNames = array_keys($createStatements);
+
+        // Build dependency graph: table => [list of tables it depends on]
+        $dependencies = [];
+        foreach ($createStatements as $table => $sql) {
+            $dependencies[$table] = [];
+            // Match REFERENCES `table_name` patterns in the CREATE TABLE SQL
+            if (preg_match_all('/REFERENCES\s+`([^`]+)`/i', $sql, $matches)) {
+                foreach ($matches[1] as $refTable) {
+                    // Only track dependencies on tables within this same set
+                    // (external references to already-existing tables are fine)
+                    if (in_array($refTable, $tableNames, true) && $refTable !== $table) {
+                        $dependencies[$table][] = $refTable;
+                    }
+                }
+                $dependencies[$table] = array_unique($dependencies[$table]);
+            }
+        }
+
+        // Topological sort (Kahn's algorithm)
+        $sorted = [];
+        $remaining = $dependencies;
+
+        // Safety counter to prevent infinite loops on circular references
+        $maxIterations = count($remaining) * count($remaining) + 1;
+        $iteration = 0;
+
+        while (!empty($remaining) && $iteration < $maxIterations) {
+            $iteration++;
+            $resolved = false;
+
+            foreach ($remaining as $table => $deps) {
+                // Check if all dependencies have been resolved (already in sorted list)
+                $unresolved = array_filter($deps, function ($dep) use ($sorted) {
+                    return !in_array($dep, $sorted, true);
+                });
+
+                if (empty($unresolved)) {
+                    $sorted[] = $table;
+                    unset($remaining[$table]);
+                    $resolved = true;
+                }
+            }
+
+            // If no progress was made, we have a circular dependency
+            // Add remaining tables as-is to avoid infinite loop
+            if (!$resolved) {
+                foreach ($remaining as $table => $deps) {
+                    $sorted[] = $table;
+                }
+                break;
+            }
+        }
+
+        // Build the ordered SQL array
+        $result = [];
+        foreach ($sorted as $table) {
+            $result[] = $createStatements[$table];
+        }
+
+        return $result;
+    }
 
     private function compareColumns(string $table, array &$diff): void
     {
