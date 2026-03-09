@@ -184,15 +184,32 @@
                 return;
             }
 
+            // --- Compute counts for tab badges ---
+            const missingBCount = Object.keys(results.missingInB || {}).length;
+            const missingACount = Object.keys(results.missingInA || {}).length;
+            const missingTotal = missingBCount + missingACount;
+            const colDiffsCount = Object.keys(results.columnDiffs || {}).length;
+            const idxDiffsCount = Object.keys(results.indexDiffs || {}).length;
+            const fkDiffsCount = Object.keys(results.fkDiffs || {}).length;
+            const sqlCountA = (fixSql.a || []).length;
+            const sqlCountB = (fixSql.b || []).length;
+            const sqlTotal = sqlCountA + sqlCountB;
+
+            const badge = (count, type) => {
+                if (count === 0) return `<span class="tab-badge tab-badge-zero">0</span>`;
+                const cls = type === 'danger' ? 'tab-badge-danger' : 'tab-badge-warning';
+                return `<span class="tab-badge ${cls}">${count}</span>`;
+            };
+
             // --- Tabs Container ---
             html += `<div class="tabs-container fade-in">
                 <div class="tabs">
                     <div class="tab active" data-tab="tab-overview">Overview</div>
-                    <div class="tab" data-tab="tab-tables">Missing Tables</div>
-                    <div class="tab" data-tab="tab-columns">Column Diffs</div>
-                    <div class="tab" data-tab="tab-indexes">Index Diffs</div>
-                    <div class="tab" data-tab="tab-fkeys">FK Diffs</div>
-                    <div class="tab" data-tab="tab-sql">SQL Fix Scripts</div>
+                    <div class="tab" data-tab="tab-tables">Missing Tables ${badge(missingTotal, 'danger')}</div>
+                    <div class="tab" data-tab="tab-columns">Column Diffs ${badge(colDiffsCount, 'warning')}</div>
+                    <div class="tab" data-tab="tab-indexes">Index Diffs ${badge(idxDiffsCount, 'warning')}</div>
+                    <div class="tab" data-tab="tab-fkeys">FK Diffs ${badge(fkDiffsCount, 'warning')}</div>
+                    <div class="tab" data-tab="tab-sql">SQL Fix Scripts ${badge(sqlTotal, 'danger')}</div>
                 </div>`;
 
             // --- Tab: Overview ---

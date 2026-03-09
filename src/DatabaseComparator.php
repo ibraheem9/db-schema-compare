@@ -87,6 +87,7 @@ class DatabaseComparator
      *   1. CREATE TABLE (dependency-sorted)
      *   2. ALTER TABLE ... ADD COLUMN / MODIFY COLUMN
      *   3. ALTER TABLE ... ADD INDEX
+     *   4. ALTER TABLE ... ADD CONSTRAINT (foreign keys)
      */
     public function generateFixSql(array $diff): array
     {
@@ -134,6 +135,16 @@ class DatabaseComparator
             }
             foreach ($d['missingInA'] as $name => $idx) {
                 $sql['a'][] = $this->addIndexSql($table, $idx);
+            }
+        }
+
+        // 4. Foreign key issues
+        foreach ($diff['fkDiffs'] as $table => $d) {
+            foreach ($d['missingInB'] as $name => $fk) {
+                $sql['b'][] = $this->addForeignKeySql($table, $fk);
+            }
+            foreach ($d['missingInA'] as $name => $fk) {
+                $sql['a'][] = $this->addForeignKeySql($table, $fk);
             }
         }
 
@@ -328,6 +339,18 @@ class DatabaseComparator
         return sprintf(
             'ALTER TABLE `%s` ADD %s `%s` (`%s`);',
             $table, $type, $idx['name'], $cols
+        );
+    }
+
+    private function addForeignKeySql(string $table, array $fk): string
+    {
+        return sprintf(
+            'ALTER TABLE `%s` ADD CONSTRAINT `%s` FOREIGN KEY (`%s`) REFERENCES `%s` (`%s`);',
+            $table,
+            $fk['CONSTRAINT_NAME'],
+            $fk['COLUMN_NAME'],
+            $fk['REFERENCED_TABLE_NAME'],
+            $fk['REFERENCED_COLUMN_NAME']
         );
     }
 
